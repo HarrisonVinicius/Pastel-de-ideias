@@ -2,17 +2,17 @@
 
 #Instructions for running the app
 
-1 - installing npm:
+1 - install project dependencies:
 
     npm install
 
-2 - running the application on a localhost:
+2 - running the application on localhost:
 
     npm run serve
 
 #App Details
 
-1 - The page was developed in PWA (progressive web app) format
+1 - The page was developed as PWA (progressive web app) format
 
 2 - The page is a Single Page Application (SPA)
 
@@ -20,11 +20,11 @@
 
 4 - The Vuetify framework has been used to improve overall application development time.
 
+5 - The image upload function uses the imgur api.
+
 #problems encountered in development
 
 1 - Due to low time availability, some additional features have not been implemented.
-
-2 - The add photo feature was designed using a public api for photo upload and access. However the use of external APIs is not in the scope of the project. so it was      not possible to know if this would be accepted in this challenge
 
 #Development team
 
