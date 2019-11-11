@@ -76,10 +76,14 @@
                             </v-layout>
                             <v-layout class="form-row-3" row wrap>
                                 <v-flex xs12>
-                                    <v-card flat style="border-radius: 15px; border: 1px solid #E43636;">
+                                    <v-card flat style="border-radius: 15px; border: 1px solid #E43636;" @click="$refs.imgInput.click()">
+                                        <div id="preview">
+                                            <img v-if="url" :src="url" />
+                                        </div>
                                         <v-card-text class="text--primary" style="display: flex; justify-content: center;">
                                             <div style=" color: #A03400;">Jogue aqui o arquivo de imagem do seu pastel ou clique para localizar a pasta</div>
                                         </v-card-text>
+                                        <input class="form-img-input" type="file" @change="imgSelected" ref="imgInput">
                                     </v-card>
                                 </v-flex>
                             </v-layout>
@@ -130,7 +134,7 @@
             <v-layout class="order-area" row wrap v-for="(item , i) in reversedItems" :key="i">
                 <v-flex xs12 >
                     <v-card class="order-item-card" transition="scale-transition" elevation="2">
-                        <img class="hidden-md-and-down order-img" src="../assets/pastel-img.png" alt="Minha Figura">                    
+                        <img class="hidden-md-and-down order-img" :src="item.image" alt="Minha Figura">                    
                         <v-layout class="order-row-1" row wrap>
                             <v-flex xs10>
                                 <h2 class="order-title-decoration"> "{{item.title}}"</h2>
@@ -159,11 +163,48 @@
                 </v-flex>
             </v-layout>
         </div>
-        
+        <v-dialog
+        v-model="dialog"
+        hide-overlay
+        persistent
+        width="300"
+        >
+            <v-card>
+                <v-card-text>
+                    Insira uma Imagem do produto
+                </v-card-text>
+            </v-card>
+        </v-dialog>
+        <v-dialog
+        v-model="dialog2"
+        hide-overlay
+        persistent
+        width="300"
+        >
+            <v-card>
+                <v-card-text>
+                    Um novo produto foi adicionado ao cardápio
+                </v-card-text>
+            </v-card>
+        </v-dialog>
+        <v-dialog
+        v-model="dialog3"
+        hide-overlay
+        persistent
+        width="300"
+        >
+            <v-card>
+                <v-card-text>
+                    Erro ao cadastrar produto
+                </v-card-text>
+            </v-card>
+        </v-dialog>
     </div>
 </template>
 
 <script>
+    import axios from 'axios';
+    
     export default {
         data () {
             return {
@@ -209,12 +250,28 @@
                         flavor: "Goiaba",
                         amount: 5,
                         details: "Um mero suco de goiaba. Tem sachet no balcão...",
-                        img: "",
+                        image: "https://encrypted-tbn0.gstatic.com/images?q=tbn%3AANd9GcRMeu2OdcVCRwTQ3hTZ4siCl_lNEVOZD6Ajn1B0MWhjeSxj0B9Y",
                     },
                 ],
                 
                 /* this property gets the value of the switch */                                
-                switchData: ''
+                switchData: '',
+
+                /* this property the selected image */                                
+                selectedImg: null,
+
+                /* this property controls de visibility of the image preview */                
+                url: null,
+                
+                /* this property controls de visibility of the image feedback dialog */                
+                dialog: false,
+                
+                /* this property controls de visibility of the menu feedback dialog */                
+                dialog2: false,
+                
+                /* this property controls de visibility of the error feedback dialog */                
+                dialog3: false
+
             }
         },
     
@@ -223,18 +280,13 @@
         
             /*  This function is responsible for validating form information and then adding an item to the array of items. */   
             validate() {
-                this.loading = true
-                let data = {
-                    title: this.title,
-                    flavor: this.flavor,
-                    amount: this.amount,
-                    details: this.details
-                }
                 if(this.$refs.form.validate()) {
-                    this.addItem(data)
-                    this.loading = false
+                    if(this.selectedImg === null){
+                        this.dialog = true
+                        return 
+                    }
+                    this.imgUpload()
                 }
-                this.loading = false
             },
             
             /* This function is responsible for adding an item to the array. This function is called in the above function if the data is valid. */
@@ -245,7 +297,53 @@
             /* This function is responsible for resetting the form fields. */
             reset () {
                 this.$refs.form.reset()
+                this.url = null
             },
+
+            /* This function is responsible for selecting the image and controls the visibility of the image preview */
+            imgSelected (event) {
+                this.selectedImg = event.target.files[0]
+                this.url = URL.createObjectURL(this.selectedImg);
+            },
+
+            /* This function is responsible for uploading the image to an api, creating an object with form data and adding an item to the menu. */
+            imgUpload () {
+                const img = new FormData();
+                this.loading = true
+                img.append('image', this.selectedImg, this.selectedImg.name)
+                axios.post('https://api.imgur.com/3/image', img, {
+                    headers: {
+                        "Authorization": "Client-ID bb421f40c6ec4f7" 
+                    },
+                    onUploadProgress: uploadEvent => {
+                        console.log('Upload Progress: ' + Math.round(uploadEvent.loaded / uploadEvent.total * 100) + '%')
+                    }
+                })
+                
+                .then( res => {                 
+                    if(res.data.data && res.data.data.link){
+                        let data = {
+                            title: this.title,
+                            flavor: this.flavor,
+                            amount: this.amount,
+                            details: this.details,
+                            image: res.data.data.link
+                        }
+                        console.log(data)
+                        this.addItem(data)
+                        this.dialog2 = true
+                    }
+                }) 
+
+                .catch ( error => {
+                    this.dialog3 = true
+                })
+                
+                .finally (() => {
+                    this.loading = false
+                }) 
+            }
+
 
         },
 
@@ -259,12 +357,44 @@
                 }
                 return newArray;
             }
+        },
+
+        /* The watchers below are controls the visibility of the feedback dialogs */
+        watch: {
+            dialog (val) {
+                if (!val) return
+
+                setTimeout(() => (this.dialog = false), 2000)
+            },
+
+            dialog2 (val) {
+                if (!val) return
+
+                setTimeout(() => (this.dialog2 = false), 2000)
+            },
+
+            dialog3 (val) {
+                if (!val) return
+
+                setTimeout(() => (this.dialog3 = false), 2000)
+            }
         }
 
     }   
 </script>
 
 <style>
+    #preview {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    #preview img {
+        max-width: 100%;
+        max-height: 500px;
+    }
+    
     .order-details-decoration {
         font-family: roboto; 
         font-style: regular; 
@@ -333,12 +463,15 @@
     }
     
     .order-img {
-        width: 100%; 
         z-index: 1; 
         position: absolute; 
-        height: 235px; 
-        width: 235px; 
+        height: 190px; 
+        width: 190px; 
         left: -155px;
+        top: 25px;
+        object-fit: cover;
+        border-radius: 25px;
+        
     }
     
     .order-item-card {
@@ -377,6 +510,15 @@
         width: 100%; 
         z-index: 1; 
         position: relative
+    }
+
+    .form-img-input {
+        z-index: 1;
+        position: absolute;
+        top: 65px;
+        left: 320px;
+        border-radius: 0px;
+        display: none;
     }
     
     .form-switch {
